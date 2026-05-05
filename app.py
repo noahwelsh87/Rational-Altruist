@@ -5,7 +5,7 @@ from datetime import datetime
 import urllib3
 from bs4 import BeautifulSoup
 
-# Suppress SSL warnings for institutional websites
+# Suppress SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- 1. THE 100-QUOTE DATABASE ---
@@ -153,7 +153,7 @@ QUOTES = [
         "author": "Kurt Vonnegut"},
 ]
 
-# --- 2. THE TEXT FEEDS ---
+# --- 2. THE TEXT FEEDS (Modified to remove Bulldog and SFI) ---
 FEEDS = {
     "Effective Altruism": {
         "EA Forum (Frontpage)": "https://forum.effectivealtruism.org/feed.xml?view=frontpage-rss",
@@ -165,7 +165,6 @@ FEEDS = {
     },
     "Philosophy & Substack": {
         "Peter Singer (Bold Reasoning)": "https://boldreasoningwithpetersinger.substack.com/feed",
-        "Bentham's Bulldog": "https://benthamsbulldog.substack.com/feed",
         "Cold Takes (Holden Karnofsky)": "https://www.cold-takes.com/rss/",
         "Slow Boring (Matt Yglesias)": "https://www.slowboring.com/feed",
         "Silver Bulletin (Nate Silver)": "https://www.natesilver.net/feed",
@@ -183,7 +182,6 @@ FEEDS = {
     },
     "Science & Complexity": {
         "Quanta Magazine (Complexity)": "https://api.quantamagazine.org/feed/",
-        "Santa Fe Institute": "https://www.santafe.edu/feeds/news",
         "ScienceDaily": "https://www.sciencedaily.com/rss/top/science.xml",
         "Nature": "https://www.nature.com/nature.rss",
         "Roots of Progress": "https://rootsofprogress.org/feed"
@@ -216,62 +214,24 @@ def fetch_news(url):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
         "Accept": "application/rss+xml, application/xml, text/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5"
     }
 
-    # Intercept SFI to scrape their news page directly
-    if "santafe.edu" in url:
-        try:
-            response = requests.get("https://www.santafe.edu/news-center/news", headers=headers, timeout=12)
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                entries = []
-
-                # SFI article link elements in news-center
-                for a_tag in soup.find_all('a', href=True):
-                    if '/news-center/news/' in a_tag['href'] and a_tag.text.strip():
-                        title = a_tag.text.strip()
-                        link = a_tag['href']
-                        if not link.startswith("http"):
-                            link = "https://www.santafe.edu" + link
-
-                        entries.append(type('Entry', (), {'title': title, 'link': link,
-                                                          'summary': "Santa Fe Institute research and complexity news."})())
-
-                        if len(entries) >= 5:
-                            break
-                if entries:
-                    return entries
-        except Exception:
-            pass
-        return []
-
-    # Attempt 1: Standard HTTPS request with custom browser headers
+    # Standard RSS retrieval
     try:
         response = requests.get(url, headers=headers, timeout=12)
         if response.status_code == 200:
             feed = feedparser.parse(response.content)
             if feed.entries:
                 return feed.entries
-    except:
+    except Exception:
         pass
 
-    # Attempt 2: Request without SSL certification verification
-    try:
-        response = requests.get(url, headers=headers, verify=False, timeout=12)
-        if response.status_code == 200:
-            feed = feedparser.parse(response.content)
-            if feed.entries:
-                return feed.entries
-    except:
-        pass
-
-    # Attempt 3: Direct parsing fallback
+    # Direct parsing fallback
     try:
         feed = feedparser.parse(url)
         if feed.entries:
             return feed.entries
-    except:
+    except Exception:
         pass
 
     return []
@@ -283,6 +243,7 @@ tabs = st.tabs(list(FEEDS.keys()))
 
 for i, category in enumerate(FEEDS.keys()):
     with tabs[i]:
+        # Handle the dynamic feeds first
         sources = FEEDS[category]
         cols = st.columns(2)
 
@@ -302,7 +263,18 @@ for i, category in enumerate(FEEDS.keys()):
                                 st.write(f"{text}...")
                     st.markdown("<br>", unsafe_allow_html=True)
 
-# --- 4. GEOGRAPHIC BASE: FAIRVIEW PARK, OH ---
+        # --- Inject Static Links into specific tabs ---
+        if category == "Philosophy & Substack":
+            st.markdown("---")
+            st.subheader("Explore More")
+            st.markdown("🔗 **[Bentham's Bulldog (Substack)](https://benthamsbulldog.substack.com)**")
+
+        elif category == "Science & Complexity":
+            st.markdown("---")
+            st.subheader("Explore More")
+            st.markdown("🔗 **[Santa Fe Institute (Official Site)](https://www.santafe.edu)**")
+
+# --- 4. GEOGRAPHIC BASE & APPLICATION CONTROL ---
 st.sidebar.title("📍 Fairview Park Base")
 st.sidebar.markdown("""
 **Backpacking & Camping:**
@@ -317,3 +289,8 @@ st.sidebar.markdown("""
 **Local Service:**
 - [VolunteerMatch Fairview Park](https://www.volunteermatch.org/search?l=Fairview+Park%2C+OH)
 """)
+
+st.sidebar.markdown("---")
+if st.sidebar.button("🛑 Stop Application"):
+    st.sidebar.warning("Application execution has been halted.")
+    st.stop()
