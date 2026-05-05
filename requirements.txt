@@ -1,0 +1,5 @@
+streamlit
+feedparser
+requests
+urllib3
+beautifulsoup4
